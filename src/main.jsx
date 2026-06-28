@@ -15,7 +15,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<App />}>

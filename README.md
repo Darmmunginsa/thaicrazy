@@ -117,6 +117,8 @@ npm run preview
 
 Deploy the `dist/` directory to any static host such as GitHub Pages, Netlify, Cloudflare Pages, or Vercel. For production, update `public/robots.txt` and `public/sitemap.xml` from `https://example.com` to the real domain.
 
+This repository includes `.github/workflows/deploy.yml` for GitHub Pages. In GitHub repository settings, set Pages source to **GitHub Actions**.
+
 ## Important Editorial Note
 
 Every post should prominently show publication date and source links. The site should describe itself as a public-memory archive or aggregator of publicly available information, not as a news publisher. The administrator is responsible for published content and comment moderation.

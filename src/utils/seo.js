@@ -12,7 +12,7 @@ export function slugify(input = '') {
 export function setPageMeta({
   title = SITE_CONFIG.name,
   description = SITE_CONFIG.description,
-  image = '/og-image.svg',
+  image = `${import.meta.env.BASE_URL}og-image.svg`,
   url = window.location.href,
   jsonLd,
 }) {
