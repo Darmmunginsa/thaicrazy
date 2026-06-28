@@ -39,13 +39,29 @@ function mockRequest(action, payload) {
   if (action === 'createComment') {
     return Promise.resolve({
       id: `local_${Date.now()}`,
+      commentId: `local_${Date.now()}`,
       ...payload,
+      displayName: payload.displayName || 'Demo Member',
       createdTime: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       likes: 0,
+      likeCount: 0,
       status: 'visible',
       pinned: false,
     })
   }
+  if (action === 'loginUser') {
+    return Promise.resolve({
+      userId: `local_user_${payload.googleId || Date.now()}`,
+      googleId: payload.googleId,
+      displayName: payload.displayName,
+      email: payload.email,
+      photoUrl: payload.photoUrl,
+      role: 'Member',
+      status: 'Active',
+    })
+  }
+  if (action === 'listUsers') return Promise.resolve([])
   if (action === 'likeComment') return Promise.resolve({ ok: true })
   if (action === 'createSuggestion') return Promise.resolve({ id: `suggestion_${Date.now()}`, ...payload })
   if (action === 'adminLogin') return Promise.resolve({ token: 'local-demo-token', name: 'Demo Admin' })
@@ -55,10 +71,21 @@ function mockRequest(action, payload) {
 export const api = {
   listPosts: (filters = {}) => request('listPosts', filters, { cacheMs: 60_000 }),
   getPost: (slug) => request('getPost', { slug }, { cacheMs: 60_000 }),
-  listComments: (postId) => request('listComments', { postId }),
+  loginUser: (profile) => request('loginUser', profile),
+  getCurrentUser: (userId) => request('getCurrentUser', { userId }),
+  listUsers: (adminUserId) => request('listUsers', { adminUserId }),
+  updateUserStatus: (adminUserId, targetUserId, status, banReason = '') =>
+    request('updateUserStatus', { adminUserId, targetUserId, status, banReason }),
+  updateUserRole: (adminUserId, targetUserId, role) => request('updateUserRole', { adminUserId, targetUserId, role }),
+  listComments: (postId) => request('listCommentsByPost', { postId }),
   createComment: (comment) => request('createComment', comment),
-  likeComment: (id) => request('likeComment', { id }),
-  reportComment: (id) => request('reportComment', { id }),
+  updateComment: (commentId, userId, comment) => request('updateComment', { commentId, userId, comment }),
+  deleteOwnComment: (commentId, userId) => request('deleteOwnComment', { commentId, userId }),
+  likeComment: (commentId, userId) => request('likeComment', { commentId, userId }),
+  reportComment: (commentId, userId) => request('reportComment', { commentId, userId }),
+  adminHideComment: (adminUserId, commentId) => request('adminHideComment', { adminUserId, commentId }),
+  adminDeleteComment: (adminUserId, commentId) => request('adminDeleteComment', { adminUserId, commentId }),
+  adminPinComment: (adminUserId, commentId, pinned = true) => request('adminPinComment', { adminUserId, commentId, pinned }),
   createSuggestion: (suggestion) => request('createSuggestion', suggestion),
   listSuggestions: (token) => request('listSuggestions', { token }),
   moderateSuggestion: (id, moderation, token) => request('moderateSuggestion', { id, moderation, token }),

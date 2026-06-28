@@ -1,5 +1,6 @@
 import { Edit3, EyeOff, Inbox, LayoutDashboard, LogIn, MessageSquare, Save, Settings, Tags, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CATEGORIES, POST_STATUSES, SITE_CONFIG } from '../config.js'
 import { api } from '../services/api.js'
 import { slugify } from '../utils/seo.js'
@@ -86,7 +87,9 @@ export default function AdminPage() {
         <AdminStat icon={<LayoutDashboard />} label="Posts" value="CRUD via Apps Script" />
         <AdminStat icon={<MessageSquare />} label="Comments" value="Delete / Hide / Pin" />
         <AdminStat icon={<Inbox />} label="Suggestions" value="Review submitted topics" />
-        <AdminStat icon={<Tags />} label="Categories & Tags" value="Google Sheet rows" />
+        <Link to="/admin/users">
+          <AdminStat icon={<Tags />} label="Users" value="Manage members" />
+        </Link>
       </section>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { CATEGORIES, SITE_CONFIG } from '../config.js'
 import { ThemeToggle } from './ThemeToggle.jsx'
+import { UserMenu } from './UserMenu.jsx'
 
 const navItems = [
   ['/', 'Latest'],
@@ -54,6 +55,9 @@ export function SiteHeader() {
         </form>
 
         <ThemeToggle />
+        <div className="hidden lg:block">
+          <UserMenu />
+        </div>
         <button
           className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 lg:hidden dark:border-zinc-800"
           type="button"
@@ -83,6 +87,7 @@ export function SiteHeader() {
                 </Link>
               ))}
             </div>
+            <UserMenu />
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((category) => (
                 <Link

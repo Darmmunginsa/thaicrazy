@@ -1,0 +1,1 @@
+function e(e){return e?new Intl.DateTimeFormat(`th-TH`,{dateStyle:`medium`}).format(new Date(e)):`-`}function t(e=0){return new Intl.NumberFormat(`th-TH`,{notation:`compact`}).format(e)}function n(e){return Array.isArray(e)?e.filter(Boolean):String(e||``).split(`,`).map(e=>e.trim()).filter(Boolean)}export{e as n,n as r,t};

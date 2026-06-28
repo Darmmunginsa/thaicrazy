@@ -53,7 +53,15 @@ Create or use an existing Google Sheet with these sheets. The Apps Script `setup
 
 ### Comments
 
-`id, postId, displayName, comment, parentId, createdTime, likes, reports, status, pinned, ipHash`
+`commentId, postId, userId, displayName, email, photoUrl, parentCommentId, comment, likeCount, reportCount, status, pinned, createdAt, updatedAt, ipHash`
+
+### Users
+
+`userId, googleId, displayName, email, photoUrl, role, status, createdAt, lastLogin, commentCount, warningCount, banReason`
+
+Allowed roles: `Admin`, `Moderator`, `Member`
+
+Allowed statuses: `Active`, `Suspended`, `Banned`
 
 ### Settings
 
@@ -74,22 +82,28 @@ Create or use an existing Google Sheet with these sheets. The Apps Script `setup
 3. Paste `apps-script/Code.gs`.
 4. In Apps Script, open Project Settings -> Script Properties.
 5. Add `ADMIN_PASSWORD` with a strong password.
-6. Run `setupSheets` once and approve permissions.
-7. Deploy -> New deployment -> Web app.
-8. Execute as: Me.
-9. Who has access: Anyone.
-10. Copy the `/exec` URL into `.env`:
+6. Optional: add `ADMIN_EMAILS` as comma-separated Google emails that should become member admins on first login.
+7. Run `setupSheets` once and approve permissions.
+8. Deploy -> New deployment -> Web app.
+9. Execute as: Me.
+10. Who has access: Anyone.
+11. Copy the `/exec` URL into `.env`:
 
 ```bash
 VITE_APPS_SCRIPT_API_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+VITE_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com
 ```
+
+For Google Login, create an OAuth Web Client in Google Cloud Console and add the production origin, for example `https://darmmunginsa.github.io`.
 
 ## API Actions
 
 The frontend sends JSON with `{ action, payload }` to Apps Script.
 
-- Public: `listPosts`, `getPost`, `listComments`, `createComment`, `likeComment`, `reportComment`, `createSuggestion`, `getSettings`, `sitemap`
-- Admin: `adminLogin`, `createPost`, `updatePost`, `deletePost`, `moderateComment`, `listSuggestions`, `moderateSuggestion`
+- Public: `listPosts`, `getPost`, `listCommentsByPost`, `loginUser`, `getCurrentUser`, `createSuggestion`, `getSettings`, `sitemap`
+- Member: `createComment`, `updateComment`, `deleteOwnComment`, `likeComment`, `reportComment`
+- Moderator: `adminHideComment`, `adminDeleteComment`, `adminPinComment`
+- Admin: `adminLogin`, `createPost`, `updatePost`, `deletePost`, `moderateComment`, `listSuggestions`, `moderateSuggestion`, `listUsers`, `updateUserStatus`, `updateUserRole`
 
 Admin actions require a token returned from `adminLogin`.
 
@@ -103,6 +117,9 @@ Admin actions require a token returned from `adminLogin`.
 - Timeline browsing
 - Related posts by shared tags
 - Visitor comments, replies, likes, reports
+- Google member login required before commenting, liking, reporting, editing, or deleting own comments
+- Users sheet with Admin, Moderator, and Member roles
+- Admin user management page at `/admin/users`
 - Public topic suggestion form for sending story ideas to the administrator
 - Admin dashboard, create post, moderation action support
 - Draft, Published, Hidden statuses

@@ -1,6 +1,7 @@
 const SHEETS = {
   posts: 'Posts',
   comments: 'Comments',
+  users: 'Users',
   suggestions: 'Suggestions',
   settings: 'Settings',
   rateLimit: 'RateLimit',
@@ -29,17 +30,36 @@ const POST_HEADERS = [
   'updatedAt',
 ]
 
-const COMMENT_HEADERS = [
-  'id',
-  'postId',
+const USER_HEADERS = [
+  'userId',
+  'googleId',
   'displayName',
+  'email',
+  'photoUrl',
+  'role',
+  'status',
+  'createdAt',
+  'lastLogin',
+  'commentCount',
+  'warningCount',
+  'banReason',
+]
+
+const COMMENT_HEADERS = [
+  'commentId',
+  'postId',
+  'userId',
+  'displayName',
+  'email',
+  'photoUrl',
+  'parentCommentId',
   'comment',
-  'parentId',
-  'createdTime',
-  'likes',
-  'reports',
+  'likeCount',
+  'reportCount',
   'status',
   'pinned',
+  'createdAt',
+  'updatedAt',
   'ipHash',
 ]
 
@@ -77,10 +97,21 @@ function route(action, payload, event) {
     const handlers = {
       listPosts,
       getPost,
+      loginUser,
+      getCurrentUser,
+      listUsers: requireRole(listUsers, ['Admin']),
+      updateUserStatus: requireRole(updateUserStatus, ['Admin']),
+      updateUserRole: requireRole(updateUserRole, ['Admin']),
       createComment: (data) => createComment(data, event),
       listComments,
+      listCommentsByPost: listComments,
+      updateComment,
+      deleteOwnComment,
       likeComment,
       reportComment,
+      adminHideComment: requireRole(adminHideComment, ['Admin', 'Moderator']),
+      adminDeleteComment: requireRole(adminDeleteComment, ['Admin', 'Moderator']),
+      adminPinComment: requireRole(adminPinComment, ['Admin', 'Moderator']),
       createSuggestion: (data) => createSuggestion(data, event),
       listSuggestions: requireAdmin(listSuggestions),
       moderateSuggestion: requireAdmin(moderateSuggestion),
@@ -171,50 +202,169 @@ function deletePost(payload) {
   return { id: payload.id }
 }
 
+function loginUser(payload) {
+  const now = new Date().toISOString()
+  const googleId = clean(payload.googleId)
+  const email = clean(payload.email).toLowerCase()
+  if (!googleId || !email) throw new Error('Google profile is required')
+
+  const users = readObjects(SHEETS.users, USER_HEADERS)
+  const existing = users.find((user) => user.googleId === googleId || String(user.email).toLowerCase() === email)
+  const adminEmails = String(PropertiesService.getScriptProperties().getProperty('ADMIN_EMAILS') || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+  const defaultRole = adminEmails.includes(email) ? 'Admin' : 'Member'
+
+  if (!existing) {
+    const user = normalizeObject(
+      {
+        userId: Utilities.getUuid(),
+        googleId,
+        displayName: clean(payload.displayName).slice(0, 120),
+        email,
+        photoUrl: clean(payload.photoUrl).slice(0, 500),
+        role: defaultRole,
+        status: 'Active',
+        createdAt: now,
+        lastLogin: now,
+        commentCount: 0,
+        warningCount: 0,
+        banReason: '',
+      },
+      USER_HEADERS,
+    )
+    appendObject(SHEETS.users, USER_HEADERS, user)
+    return publicUser(user)
+  }
+
+  updateObject(SHEETS.users, USER_HEADERS, existing.userId, {
+    displayName: clean(payload.displayName).slice(0, 120),
+    photoUrl: clean(payload.photoUrl).slice(0, 500),
+    lastLogin: now,
+    role: existing.role || defaultRole,
+  })
+  return publicUser({ ...existing, displayName: clean(payload.displayName), photoUrl: clean(payload.photoUrl), lastLogin: now })
+}
+
+function getCurrentUser(payload) {
+  const user = getUserById(payload.userId)
+  return publicUser(user)
+}
+
+function listUsers() {
+  return readObjects(SHEETS.users, USER_HEADERS).map(publicUser)
+}
+
+function updateUserStatus(payload) {
+  const status = clean(payload.status)
+  if (!['Active', 'Suspended', 'Banned'].includes(status)) throw new Error('Invalid status')
+  updateObject(SHEETS.users, USER_HEADERS, payload.targetUserId, {
+    status,
+    banReason: clean(payload.banReason || ''),
+  })
+  return { userId: payload.targetUserId, status }
+}
+
+function updateUserRole(payload) {
+  const role = clean(payload.role)
+  if (!['Admin', 'Moderator', 'Member'].includes(role)) throw new Error('Invalid role')
+  updateObject(SHEETS.users, USER_HEADERS, payload.targetUserId, { role })
+  return { userId: payload.targetUserId, role }
+}
+
 function listComments(payload) {
   return readObjects(SHEETS.comments, COMMENT_HEADERS)
-    .filter((item) => item.postId === payload.postId && item.status !== 'deleted' && item.status !== 'hidden')
-    .sort((a, b) => Number(b.pinned === true || b.pinned === 'TRUE') - Number(a.pinned === true || a.pinned === 'TRUE') || new Date(b.createdTime) - new Date(a.createdTime))
+    .filter((item) => item.postId === payload.postId && item.status !== 'Deleted' && item.status !== 'Hidden')
+    .sort((a, b) => Number(b.pinned === true || b.pinned === 'TRUE') - Number(a.pinned === true || a.pinned === 'TRUE') || new Date(b.createdAt) - new Date(a.createdAt))
 }
 
 function createComment(payload, event) {
+  const user = getActiveUser(payload.userId)
   const fingerprint = hashIp(event)
   enforceCommentRateLimit(fingerprint)
   const comment = clean(payload.comment)
   if (isSpam(comment)) throw new Error('Spam detected')
+  if (!comment || comment.length > 1000) throw new Error('Invalid comment')
   const row = normalizeObject(
     {
-      id: Utilities.getUuid(),
+      commentId: Utilities.getUuid(),
       postId: clean(payload.postId),
-      displayName: clean(payload.displayName).slice(0, 80),
-      comment: comment.slice(0, 1200),
-      parentId: clean(payload.parentId || ''),
-      createdTime: new Date().toISOString(),
-      likes: 0,
-      reports: 0,
-      status: 'visible',
+      userId: user.userId,
+      displayName: user.displayName,
+      email: user.email,
+      photoUrl: user.photoUrl,
+      parentCommentId: clean(payload.parentCommentId || payload.parentId || ''),
+      comment: comment.slice(0, 1000),
+      likeCount: 0,
+      reportCount: 0,
+      status: 'Visible',
       pinned: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: '',
       ipHash: fingerprint,
     },
     COMMENT_HEADERS,
   )
   appendObject(SHEETS.comments, COMMENT_HEADERS, row)
+  updateObject(SHEETS.users, USER_HEADERS, user.userId, { commentCount: Number(user.commentCount || 0) + 1 })
   return row
 }
 
+function updateComment(payload) {
+  const user = getActiveUser(payload.userId)
+  const comment = getCommentById(payload.commentId)
+  if (comment.userId !== user.userId) throw new Error('Forbidden')
+  const text = clean(payload.comment)
+  if (!text || text.length > 1000) throw new Error('Invalid comment')
+  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, {
+    comment: text,
+    updatedAt: new Date().toISOString(),
+  })
+  return { ...comment, comment: text, updatedAt: new Date().toISOString() }
+}
+
+function deleteOwnComment(payload) {
+  const user = getUserById(payload.userId)
+  const comment = getCommentById(payload.commentId)
+  if (comment.userId !== user.userId) throw new Error('Forbidden')
+  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, {
+    status: 'Deleted',
+    updatedAt: new Date().toISOString(),
+  })
+  return { commentId: payload.commentId }
+}
+
 function likeComment(payload) {
-  mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.id, 'likes', 1)
-  return { id: payload.id }
+  getActiveUser(payload.userId)
+  mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.commentId || payload.id, 'likeCount', 1, 'commentId')
+  return { commentId: payload.commentId || payload.id }
 }
 
 function reportComment(payload) {
-  mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.id, 'reports', 1)
-  return { id: payload.id }
+  getActiveUser(payload.userId)
+  mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.commentId || payload.id, 'reportCount', 1, 'commentId')
+  return { commentId: payload.commentId || payload.id }
 }
 
 function moderateComment(payload) {
   updateObject(SHEETS.comments, COMMENT_HEADERS, payload.id, payload.moderation || {})
   return { id: payload.id }
+}
+
+function adminHideComment(payload) {
+  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { status: 'Hidden', updatedAt: new Date().toISOString() })
+  return { commentId: payload.commentId }
+}
+
+function adminDeleteComment(payload) {
+  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { status: 'Deleted', updatedAt: new Date().toISOString() })
+  return { commentId: payload.commentId }
+}
+
+function adminPinComment(payload) {
+  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { pinned: Boolean(payload.pinned), updatedAt: new Date().toISOString() })
+  return { commentId: payload.commentId, pinned: Boolean(payload.pinned) }
 }
 
 function createSuggestion(payload, event) {
@@ -284,6 +434,16 @@ function requireAdmin(handler) {
   }
 }
 
+function requireRole(handler, roles) {
+  return (payload) => {
+    const adminUserId = payload.adminUserId
+    const user = getUserById(adminUserId)
+    if (!roles.includes(user.role)) throw new Error('Unauthorized')
+    if (user.status !== 'Active') throw new Error('Account restricted')
+    return handler(payload)
+  }
+}
+
 function getSettings() {
   return readObjects(SHEETS.settings, ['key', 'value']).reduce((result, item) => {
     result[item.key] = item.value
@@ -297,6 +457,7 @@ function sitemap() {
 
 function setupSheets() {
   ensureSheet(SHEETS.posts, POST_HEADERS)
+  ensureSheet(SHEETS.users, USER_HEADERS)
   ensureSheet(SHEETS.comments, COMMENT_HEADERS)
   ensureSheet(SHEETS.suggestions, SUGGESTION_HEADERS)
   ensureSheet(SHEETS.settings, ['key', 'value'])
@@ -309,6 +470,11 @@ function ensureSheet(name, headers) {
   if (!sheet) sheet = ss.insertSheet(name)
   const current = sheet.getRange(1, 1, 1, headers.length).getValues()[0]
   if (current.join('') === '') sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+  else {
+    const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    const missing = headers.filter((header) => !existing.includes(header))
+    if (missing.length) sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
+  }
 }
 
 function readObjects(sheetName, headers) {
@@ -329,33 +495,36 @@ function appendObject(sheetName, headers, object) {
   SpreadsheetApp.getActive().getSheetByName(sheetName).appendRow(headers.map((header) => object[header] ?? ''))
 }
 
-function updateObject(sheetName, headers, id, patch) {
+function updateObject(sheetName, headers, id, patch, idField) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName)
   const values = sheet.getDataRange().getValues()
-  const idColumn = values[0].indexOf('id')
+  const keyField = idField || inferIdField(headers)
+  const idColumn = values[0].indexOf(keyField)
   const rowIndex = values.findIndex((row, index) => index > 0 && row[idColumn] === id)
   if (rowIndex < 1) throw new Error('Row not found')
   const next = values[rowIndex].slice()
   headers.forEach((header) => {
-    if (Object.prototype.hasOwnProperty.call(patch, header)) next[values[0].indexOf(header)] = patch[header]
+    const colIndex = values[0].indexOf(header)
+    if (colIndex >= 0 && Object.prototype.hasOwnProperty.call(patch, header)) next[colIndex] = patch[header]
   })
   sheet.getRange(rowIndex + 1, 1, 1, next.length).setValues([next])
 }
 
-function deleteObject(sheetName, headers, id) {
+function deleteObject(sheetName, headers, id, idField) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName)
   const values = sheet.getDataRange().getValues()
-  const idColumn = values[0].indexOf('id')
+  const idColumn = values[0].indexOf(idField || inferIdField(headers))
   const rowIndex = values.findIndex((row, index) => index > 0 && row[idColumn] === id)
   if (rowIndex < 1) throw new Error('Row not found')
   sheet.deleteRow(rowIndex + 1)
 }
 
-function mutateNumber(sheetName, headers, id, field, delta) {
+function mutateNumber(sheetName, headers, id, field, delta, idField) {
   const rows = readObjects(sheetName, headers)
-  const row = rows.find((item) => item.id === id)
+  const keyField = idField || inferIdField(headers)
+  const row = rows.find((item) => item[keyField] === id)
   if (!row) throw new Error('Row not found')
-  updateObject(sheetName, headers, id, { [field]: Number(row[field] || 0) + delta })
+  updateObject(sheetName, headers, id, { [field]: Number(row[field] || 0) + delta }, keyField)
 }
 
 function incrementPostViews(id) {
@@ -371,6 +540,48 @@ function normalizeObject(object, headers) {
     result[header] = object[header] ?? ''
     return result
   }, {})
+}
+
+function inferIdField(headers) {
+  if (headers.includes('id')) return 'id'
+  if (headers.includes('userId')) return 'userId'
+  if (headers.includes('commentId')) return 'commentId'
+  return headers[0]
+}
+
+function getUserById(userId) {
+  const user = readObjects(SHEETS.users, USER_HEADERS).find((item) => item.userId === userId)
+  if (!user) throw new Error('User not found')
+  return user
+}
+
+function getActiveUser(userId) {
+  const user = getUserById(userId)
+  if (user.status !== 'Active') throw new Error('Account restricted')
+  return user
+}
+
+function getCommentById(commentId) {
+  const comment = readObjects(SHEETS.comments, COMMENT_HEADERS).find((item) => item.commentId === commentId)
+  if (!comment) throw new Error('Comment not found')
+  return comment
+}
+
+function publicUser(user) {
+  return {
+    userId: user.userId,
+    googleId: user.googleId,
+    displayName: user.displayName,
+    email: user.email,
+    photoUrl: user.photoUrl,
+    role: user.role || 'Member',
+    status: user.status || 'Active',
+    createdAt: user.createdAt,
+    lastLogin: user.lastLogin,
+    commentCount: Number(user.commentCount || 0),
+    warningCount: Number(user.warningCount || 0),
+    banReason: user.banReason || '',
+  }
 }
 
 function enforceCommentRateLimit(fingerprint) {
