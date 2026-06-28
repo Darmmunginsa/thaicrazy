@@ -28,6 +28,30 @@ textarea {
   font: inherit;
 }
 
+button,
+a,
+select,
+summary,
+[role='button'],
+[type='button'],
+[type='submit'],
+[type='reset'] {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
+button:disabled,
+[aria-disabled='true'],
+select:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
 img {
   background: #f5f5f5;
 }
