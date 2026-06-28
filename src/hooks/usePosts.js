@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
-import { api } from '../services/api.js'
+import { api, getCachedResult } from '../services/api.js'
 
 export function usePosts(filters = {}) {
   const [posts, setPosts] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !getCachedResult('listPosts', filters))
   const [error, setError] = useState('')
   const filterKey = JSON.stringify(filters)
 
   useEffect(() => {
     let alive = true
     const activeFilters = JSON.parse(filterKey)
-    setLoading(true)
+    const cached = getCachedResult('listPosts', activeFilters)
+    if (cached) {
+      setPosts(cached || [])
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     api
       .listPosts(activeFilters)
       .then((data) => {

@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { CommentSection } from '../components/CommentSection.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { SourceCard } from '../components/SourceCard.jsx'
-import { api } from '../services/api.js'
+import { api, getCachedResult } from '../services/api.js'
 import { usePosts } from '../hooks/usePosts.js'
 import { compactNumber, formatDate, splitList } from '../utils/format.js'
 import { setPageMeta } from '../utils/seo.js'
@@ -18,28 +18,20 @@ export default function PostPage() {
 
   useEffect(() => {
     let alive = true
-    setLoading(true)
+    const cached = getCachedResult('getPost', { slug })
+    if (cached) {
+      setPost(cached)
+      setLoading(false)
+      applyMeta(cached)
+    } else {
+      setLoading(true)
+    }
     api
       .getPost(slug)
       .then((data) => {
         if (!alive) return
         setPost(data)
-        if (data) {
-          const previewImage = data.coverImage || getYouTubeThumbnail(data.youtubeUrl) || `${import.meta.env.BASE_URL}og-image.svg`
-          setPageMeta({
-            title: data.metaTitle || data.title,
-            description: data.metaDescription || data.description,
-            image: previewImage,
-            jsonLd: {
-              '@context': 'https://schema.org',
-              '@type': 'Article',
-              headline: data.title,
-              description: data.description,
-              image: previewImage,
-              datePublished: data.publishDate,
-            },
-          })
-        }
+        applyMeta(data)
       })
       .finally(() => alive && setLoading(false))
     return () => {
@@ -141,4 +133,22 @@ export default function PostPage() {
       </div>
     </article>
   )
+}
+
+function applyMeta(data) {
+  if (!data) return
+  const previewImage = data.coverImage || getYouTubeThumbnail(data.youtubeUrl) || `${import.meta.env.BASE_URL}og-image.svg`
+  setPageMeta({
+    title: data.metaTitle || data.title,
+    description: data.metaDescription || data.description,
+    image: previewImage,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: data.title,
+      description: data.description,
+      image: previewImage,
+      datePublished: data.publishDate,
+    },
+  })
 }

@@ -131,7 +131,7 @@ function route(action, payload, event) {
 }
 
 function listPosts(filters) {
-  const posts = readObjects(SHEETS.posts, POST_HEADERS)
+  const posts = cachedReadObjects(SHEETS.posts, POST_HEADERS, 120)
     .filter((post) => post.status === 'Published')
     .sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate))
   if (!filters) return posts
@@ -151,10 +151,9 @@ function listPosts(filters) {
 }
 
 function getPost(payload) {
-  const posts = readObjects(SHEETS.posts, POST_HEADERS)
+  const posts = cachedReadObjects(SHEETS.posts, POST_HEADERS, 120)
   const post = posts.find((item) => item.slug === payload.slug || item.id === payload.id)
   if (!post || post.status === 'Hidden') throw new Error('Post not found')
-  incrementPostViews(post.id)
   return post
 }
 
@@ -187,6 +186,7 @@ function createPost(payload) {
     POST_HEADERS,
   )
   appendObject(SHEETS.posts, POST_HEADERS, row)
+  invalidateSheetCache(SHEETS.posts)
   return row
 }
 
@@ -194,11 +194,13 @@ function updatePost(payload) {
   const post = payload.post || payload
   if (!post.id) throw new Error('Post id is required')
   updateObject(SHEETS.posts, POST_HEADERS, post.id, { ...post, updatedAt: new Date().toISOString() })
+  invalidateSheetCache(SHEETS.posts)
   return { id: post.id }
 }
 
 function deletePost(payload) {
   deleteObject(SHEETS.posts, POST_HEADERS, payload.id)
+  invalidateSheetCache(SHEETS.posts)
   return { id: payload.id }
 }
 
@@ -274,7 +276,7 @@ function updateUserRole(payload) {
 }
 
 function listComments(payload) {
-  return readObjects(SHEETS.comments, COMMENT_HEADERS)
+  return cachedReadObjects(SHEETS.comments, COMMENT_HEADERS, 30)
     .map(normalizeCommentRecord)
     .filter((item) => item.postId === payload.postId && item.status !== 'Deleted' && item.status !== 'Hidden')
     .sort((a, b) => Number(b.pinned === true || b.pinned === 'TRUE') - Number(a.pinned === true || a.pinned === 'TRUE') || new Date(b.createdAt) - new Date(a.createdAt))
@@ -308,7 +310,9 @@ function createComment(payload, event) {
     COMMENT_HEADERS,
   )
   appendObject(SHEETS.comments, COMMENT_HEADERS, row)
+  invalidateSheetCache(SHEETS.comments)
   updateObject(SHEETS.users, USER_HEADERS, user.userId, { commentCount: Number(user.commentCount || 0) + 1 })
+  invalidateSheetCache(SHEETS.users)
   return row
 }
 
@@ -322,6 +326,7 @@ function updateComment(payload) {
     comment: text,
     updatedAt: new Date().toISOString(),
   })
+  invalidateSheetCache(SHEETS.comments)
   return { ...comment, comment: text, updatedAt: new Date().toISOString() }
 }
 
@@ -333,18 +338,21 @@ function deleteOwnComment(payload) {
     status: 'Deleted',
     updatedAt: new Date().toISOString(),
   })
+  invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId }
 }
 
 function likeComment(payload) {
   getActiveUser(payload.userId)
   mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.commentId || payload.id, 'likeCount', 1, 'commentId')
+  invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId || payload.id }
 }
 
 function reportComment(payload) {
   getActiveUser(payload.userId)
   mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.commentId || payload.id, 'reportCount', 1, 'commentId')
+  invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId || payload.id }
 }
 
@@ -355,16 +363,19 @@ function moderateComment(payload) {
 
 function adminHideComment(payload) {
   updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { status: 'Hidden', updatedAt: new Date().toISOString() })
+  invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId }
 }
 
 function adminDeleteComment(payload) {
   updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { status: 'Deleted', updatedAt: new Date().toISOString() })
+  invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId }
 }
 
 function adminPinComment(payload) {
   updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { pinned: Boolean(payload.pinned), updatedAt: new Date().toISOString() })
+  invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId, pinned: Boolean(payload.pinned) }
 }
 
@@ -490,6 +501,20 @@ function readObjects(sheetName, headers) {
       return item
     }, {})
   })
+}
+
+function cachedReadObjects(sheetName, headers, ttlSeconds) {
+  const cache = CacheService.getScriptCache()
+  const key = `sheet:${sheetName}:v2`
+  const cached = cache.get(key)
+  if (cached) return JSON.parse(cached)
+  const rows = readObjects(sheetName, headers)
+  cache.put(key, JSON.stringify(rows), ttlSeconds)
+  return rows
+}
+
+function invalidateSheetCache(sheetName) {
+  CacheService.getScriptCache().remove(`sheet:${sheetName}:v2`)
 }
 
 function appendObject(sheetName, headers, object) {

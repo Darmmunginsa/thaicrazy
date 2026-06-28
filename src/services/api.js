@@ -2,6 +2,7 @@ import { SITE_CONFIG } from '../config.js'
 import { mockComments, mockPosts } from '../data/mockData.js'
 
 const cache = new Map()
+const storagePrefix = 'ktln_api_cache:'
 
 async function request(action, payload = {}, { method = 'GET', cacheMs = 0 } = {}) {
   const cacheKey = `${action}:${JSON.stringify(payload)}`
@@ -26,8 +27,32 @@ async function request(action, payload = {}, { method = 'GET', cacheMs = 0 } = {
   if (!response.ok) throw new Error(`API error ${response.status}`)
   const data = await response.json()
   if (!data.ok) throw new Error(data.error || 'API request failed')
-  if (cacheMs) cache.set(cacheKey, { time: Date.now(), data: data.result })
+  if (cacheMs) setCachedResult(cacheKey, data.result)
   return data.result
+}
+
+export function getCachedResult(action, payload = {}, maxAgeMs = 5 * 60_000) {
+  const cacheKey = `${action}:${JSON.stringify(payload)}`
+  const memory = cache.get(cacheKey)
+  if (memory && Date.now() - memory.time < maxAgeMs) return memory.data
+
+  try {
+    const stored = JSON.parse(localStorage.getItem(`${storagePrefix}${cacheKey}`) || 'null')
+    if (stored && Date.now() - stored.time < maxAgeMs) return stored.data
+  } catch {
+    return null
+  }
+  return null
+}
+
+function setCachedResult(cacheKey, data) {
+  const entry = { time: Date.now(), data }
+  cache.set(cacheKey, entry)
+  try {
+    localStorage.setItem(`${storagePrefix}${cacheKey}`, JSON.stringify(entry))
+  } catch {
+    // Ignore storage pressure; memory cache still works for this session.
+  }
 }
 
 function mockRequest(action, payload) {
@@ -77,7 +102,7 @@ export const api = {
   updateUserStatus: (adminUserId, targetUserId, status, banReason = '') =>
     request('updateUserStatus', { adminUserId, targetUserId, status, banReason }),
   updateUserRole: (adminUserId, targetUserId, role) => request('updateUserRole', { adminUserId, targetUserId, role }),
-  listComments: (postId) => request('listCommentsByPost', { postId }),
+  listComments: (postId) => request('listCommentsByPost', { postId }, { cacheMs: 20_000 }),
   createComment: (comment) => request('createComment', comment),
   updateComment: (commentId, userId, comment) => request('updateComment', { commentId, userId, comment }),
   deleteOwnComment: (commentId, userId) => request('deleteOwnComment', { commentId, userId }),
