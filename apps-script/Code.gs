@@ -275,6 +275,7 @@ function updateUserRole(payload) {
 
 function listComments(payload) {
   return readObjects(SHEETS.comments, COMMENT_HEADERS)
+    .map(normalizeCommentRecord)
     .filter((item) => item.postId === payload.postId && item.status !== 'Deleted' && item.status !== 'Hidden')
     .sort((a, b) => Number(b.pinned === true || b.pinned === 'TRUE') - Number(a.pinned === true || a.pinned === 'TRUE') || new Date(b.createdAt) - new Date(a.createdAt))
 }
@@ -492,7 +493,13 @@ function readObjects(sheetName, headers) {
 }
 
 function appendObject(sheetName, headers, object) {
-  SpreadsheetApp.getActive().getSheetByName(sheetName).appendRow(headers.map((header) => object[header] ?? ''))
+  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName)
+  const actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+  const row = actualHeaders.map((header) => {
+    if (Object.prototype.hasOwnProperty.call(object, header)) return object[header] ?? ''
+    return ''
+  })
+  sheet.appendRow(row)
 }
 
 function updateObject(sheetName, headers, id, patch, idField) {
@@ -581,6 +588,28 @@ function publicUser(user) {
     commentCount: Number(user.commentCount || 0),
     warningCount: Number(user.warningCount || 0),
     banReason: user.banReason || '',
+  }
+}
+
+function normalizeCommentRecord(item) {
+  if (item.ipHash !== 'Visible') return item
+
+  return {
+    commentId: item.id,
+    postId: item.postId,
+    userId: item.displayName,
+    displayName: item.comment,
+    email: item.parentId,
+    photoUrl: item.createdTime,
+    parentCommentId: '',
+    comment: item.reports,
+    likeCount: Number(item.status || 0),
+    reportCount: Number(item.pinned || 0),
+    status: item.ipHash,
+    pinned: false,
+    createdAt: item.userId,
+    updatedAt: '',
+    ipHash: item.photoUrl,
   }
 }
 
