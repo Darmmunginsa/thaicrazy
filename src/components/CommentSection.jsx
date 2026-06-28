@@ -10,6 +10,7 @@ import { GoogleLoginButton } from './GoogleLoginButton.jsx'
 export function CommentSection({ postId }) {
   const { user, isLoggedIn, canComment } = useAuth()
   const [comments, setComments] = useState([])
+  const [likedComments, setLikedComments] = useState(() => new Set())
   const [form, setForm] = useState({ comment: '', parentId: '' })
   const [editing, setEditing] = useState(null)
   const [message, setMessage] = useState('')
@@ -77,7 +78,12 @@ export function CommentSection({ postId }) {
       setMessage('กรุณาเข้าสู่ระบบก่อนกดถูกใจ')
       return
     }
+    if (likedComments.has(id)) {
+      setMessage('คุณกดถูกใจความคิดเห็นนี้แล้ว')
+      return
+    }
     await api.likeComment(id, user.userId)
+    setLikedComments((current) => new Set([...current, id]))
     setComments((items) =>
       items.map((item) => ((item.commentId || item.id) === id ? { ...item, likeCount: Number(item.likeCount || item.likes || 0) + 1 } : item)),
     )
@@ -181,7 +187,11 @@ export function CommentSection({ postId }) {
               </div>
               <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{item.comment}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button onClick={() => like(id)} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1 text-xs dark:border-zinc-700">
+                <button
+                  onClick={() => like(id)}
+                  disabled={likedComments.has(id)}
+                  className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1 text-xs disabled:opacity-60 dark:border-zinc-700"
+                >
                   <Heart size={14} /> {item.likeCount || 0}
                 </button>
                 <button onClick={() => replyTo(item)} className="rounded-full border border-zinc-200 px-3 py-1 text-xs dark:border-zinc-700">

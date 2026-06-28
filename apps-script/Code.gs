@@ -3,6 +3,7 @@ const SHEETS = {
   comments: 'Comments',
   users: 'Users',
   suggestions: 'Suggestions',
+  commentLikes: 'CommentLikes',
   settings: 'Settings',
   rateLimit: 'RateLimit',
 }
@@ -78,6 +79,13 @@ const SUGGESTION_HEADERS = [
   'createdTime',
   'updatedAt',
   'ipHash',
+]
+
+const COMMENT_LIKE_HEADERS = [
+  'id',
+  'commentId',
+  'userId',
+  'createdAt',
 ]
 
 function doGet(event) {
@@ -344,9 +352,21 @@ function deleteOwnComment(payload) {
 
 function likeComment(payload) {
   getActiveUser(payload.userId)
-  mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.commentId || payload.id, 'likeCount', 1, 'commentId')
+  const commentId = payload.commentId || payload.id
+  const existing = readObjects(SHEETS.commentLikes, COMMENT_LIKE_HEADERS).find(
+    (item) => item.commentId === commentId && item.userId === payload.userId,
+  )
+  if (existing) return { commentId, alreadyLiked: true }
+  appendObject(SHEETS.commentLikes, COMMENT_LIKE_HEADERS, {
+    id: Utilities.getUuid(),
+    commentId,
+    userId: payload.userId,
+    createdAt: new Date().toISOString(),
+  })
+  mutateNumber(SHEETS.comments, COMMENT_HEADERS, commentId, 'likeCount', 1, 'commentId')
   invalidateSheetCache(SHEETS.comments)
-  return { commentId: payload.commentId || payload.id }
+  invalidateSheetCache(SHEETS.commentLikes)
+  return { commentId, alreadyLiked: false }
 }
 
 function reportComment(payload) {
@@ -472,6 +492,7 @@ function setupSheets() {
   ensureSheet(SHEETS.users, USER_HEADERS)
   ensureSheet(SHEETS.comments, COMMENT_HEADERS)
   ensureSheet(SHEETS.suggestions, SUGGESTION_HEADERS)
+  ensureSheet(SHEETS.commentLikes, COMMENT_LIKE_HEADERS)
   ensureSheet(SHEETS.settings, ['key', 'value'])
   ensureSheet(SHEETS.rateLimit, ['fingerprint', 'lastCommentAt'])
 }
