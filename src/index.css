@@ -28,6 +28,28 @@ textarea {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  color: rgb(24 24 27);
+}
+
+select option {
+  color: rgb(24 24 27);
+  background: #ffffff;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  color: rgb(244 244 245);
+}
+
+.dark select option {
+  color: rgb(244 244 245);
+  background: rgb(24 24 27);
+}
+
 button,
 a,
 select,
