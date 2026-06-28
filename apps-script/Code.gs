@@ -1,6 +1,7 @@
 const SHEETS = {
   posts: 'Posts',
   comments: 'Comments',
+  suggestions: 'Suggestions',
   settings: 'Settings',
   rateLimit: 'RateLimit',
 }
@@ -42,6 +43,23 @@ const COMMENT_HEADERS = [
   'ipHash',
 ]
 
+const SUGGESTION_HEADERS = [
+  'id',
+  'displayName',
+  'contact',
+  'title',
+  'summary',
+  'sourceUrls',
+  'category',
+  'tags',
+  'reason',
+  'status',
+  'adminNote',
+  'createdTime',
+  'updatedAt',
+  'ipHash',
+]
+
 function doGet(event) {
   const action = event.parameter.action
   const payload = safeJson(event.parameter.payload || '{}')
@@ -63,6 +81,9 @@ function route(action, payload, event) {
       listComments,
       likeComment,
       reportComment,
+      createSuggestion: (data) => createSuggestion(data, event),
+      listSuggestions: requireAdmin(listSuggestions),
+      moderateSuggestion: requireAdmin(moderateSuggestion),
       adminLogin,
       createPost: requireAdmin(createPost),
       updatePost: requireAdmin(updatePost),
@@ -196,6 +217,54 @@ function moderateComment(payload) {
   return { id: payload.id }
 }
 
+function createSuggestion(payload, event) {
+  const fingerprint = hashIp(event)
+  enforceSuggestionRateLimit(fingerprint)
+  const title = clean(payload.title).slice(0, 180)
+  const summary = clean(payload.summary).slice(0, 1800)
+  const sourceUrls = clean(payload.sourceUrls).slice(0, 2000)
+  if (!title || !summary || !sourceUrls) throw new Error('Title, summary, and source URLs are required')
+  if (isSpam([title, summary, sourceUrls].join(' '))) throw new Error('Spam detected')
+
+  const now = new Date().toISOString()
+  const row = normalizeObject(
+    {
+      id: Utilities.getUuid(),
+      displayName: clean(payload.displayName).slice(0, 80),
+      contact: clean(payload.contact).slice(0, 160),
+      title,
+      summary,
+      sourceUrls,
+      category: clean(payload.category).slice(0, 80),
+      tags: clean(payload.tags).slice(0, 240),
+      reason: clean(payload.reason).slice(0, 600),
+      status: 'new',
+      adminNote: '',
+      createdTime: now,
+      updatedAt: now,
+      ipHash: fingerprint,
+    },
+    SUGGESTION_HEADERS,
+  )
+  appendObject(SHEETS.suggestions, SUGGESTION_HEADERS, row)
+  return { id: row.id, status: row.status, createdTime: row.createdTime }
+}
+
+function listSuggestions(payload) {
+  const status = clean(payload.status || '')
+  return readObjects(SHEETS.suggestions, SUGGESTION_HEADERS)
+    .filter((item) => !status || item.status === status)
+    .sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime))
+}
+
+function moderateSuggestion(payload) {
+  updateObject(SHEETS.suggestions, SUGGESTION_HEADERS, payload.id, {
+    ...(payload.moderation || {}),
+    updatedAt: new Date().toISOString(),
+  })
+  return { id: payload.id }
+}
+
 function adminLogin(payload) {
   const password = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD')
   if (!password) throw new Error('ADMIN_PASSWORD is not configured')
@@ -229,6 +298,7 @@ function sitemap() {
 function setupSheets() {
   ensureSheet(SHEETS.posts, POST_HEADERS)
   ensureSheet(SHEETS.comments, COMMENT_HEADERS)
+  ensureSheet(SHEETS.suggestions, SUGGESTION_HEADERS)
   ensureSheet(SHEETS.settings, ['key', 'value'])
   ensureSheet(SHEETS.rateLimit, ['fingerprint', 'lastCommentAt'])
 }
@@ -315,6 +385,21 @@ function enforceCommentRateLimit(fingerprint) {
     }
   }
   sheet.appendRow([fingerprint, now])
+}
+
+function enforceSuggestionRateLimit(fingerprint) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.rateLimit)
+  const values = sheet.getDataRange().getValues()
+  const now = Date.now()
+  const key = `suggestion:${fingerprint}`
+  for (let i = 1; i < values.length; i += 1) {
+    if (values[i][0] === key) {
+      if (now - Number(values[i][1]) < 300000) throw new Error('Rate limited')
+      sheet.getRange(i + 1, 2).setValue(now)
+      return
+    }
+  }
+  sheet.appendRow([key, now])
 }
 
 function hashIp(event) {

@@ -1,4 +1,4 @@
-import { Edit3, EyeOff, LayoutDashboard, LogIn, MessageSquare, Save, Settings, Tags, Trash2 } from 'lucide-react'
+import { Edit3, EyeOff, Inbox, LayoutDashboard, LogIn, MessageSquare, Save, Settings, Tags, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { CATEGORIES, POST_STATUSES, SITE_CONFIG } from '../config.js'
 import { api } from '../services/api.js'
@@ -85,8 +85,8 @@ export default function AdminPage() {
       <section className="mt-6 grid gap-4 md:grid-cols-4">
         <AdminStat icon={<LayoutDashboard />} label="Posts" value="CRUD via Apps Script" />
         <AdminStat icon={<MessageSquare />} label="Comments" value="Delete / Hide / Pin" />
+        <AdminStat icon={<Inbox />} label="Suggestions" value="Review submitted topics" />
         <AdminStat icon={<Tags />} label="Categories & Tags" value="Google Sheet rows" />
-        <AdminStat icon={<Settings />} label="Site Settings" value="SEO / Ads / Info" />
       </section>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -135,8 +135,10 @@ export default function AdminPage() {
 
         <aside className="space-y-4">
           <AdminBox icon={<MessageSquare />} title="Manage Comments" text="ใช้ Apps Script actions: moderateComment, deleteComment, hideComment, pinComment" />
+          <AdminBox icon={<Inbox />} title="Topic Suggestions" text="รายการจากผู้ชมจะเข้า Sheet Suggestions สถานะ new เพื่อให้แอดมินตรวจสอบแหล่งอ้างอิงก่อนสร้างโพสต์จริง" />
           <AdminBox icon={<Trash2 />} title="Delete Post" text="ลบโพสต์ผ่าน deletePost โดยส่ง token ผู้ดูแลทุกครั้ง" />
           <AdminBox icon={<EyeOff />} title="Hidden Status" text="โพสต์สถานะ Hidden จะไม่ถูกส่งกลับใน listPosts สาธารณะ" />
+          <AdminBox icon={<Settings />} title="Site Settings" text="รองรับ settings ผ่าน Google Sheet สำหรับ SEO, Ads และข้อมูลเว็บไซต์ในอนาคต" />
         </aside>
       </div>
     </div>

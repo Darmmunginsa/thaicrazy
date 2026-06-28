@@ -63,6 +63,10 @@ Create or use an existing Google Sheet with these sheets. The Apps Script `setup
 
 `fingerprint, lastCommentAt`
 
+### Suggestions
+
+`id, displayName, contact, title, summary, sourceUrls, category, tags, reason, status, adminNote, createdTime, updatedAt, ipHash`
+
 ## Apps Script Deployment
 
 1. Open the Google Sheet.
@@ -84,8 +88,8 @@ VITE_APPS_SCRIPT_API_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/e
 
 The frontend sends JSON with `{ action, payload }` to Apps Script.
 
-- Public: `listPosts`, `getPost`, `listComments`, `createComment`, `likeComment`, `reportComment`, `getSettings`, `sitemap`
-- Admin: `adminLogin`, `createPost`, `updatePost`, `deletePost`, `moderateComment`
+- Public: `listPosts`, `getPost`, `listComments`, `createComment`, `likeComment`, `reportComment`, `createSuggestion`, `getSettings`, `sitemap`
+- Admin: `adminLogin`, `createPost`, `updatePost`, `deletePost`, `moderateComment`, `listSuggestions`, `moderateSuggestion`
 
 Admin actions require a token returned from `adminLogin`.
 
@@ -99,6 +103,7 @@ Admin actions require a token returned from `adminLogin`.
 - Timeline browsing
 - Related posts by shared tags
 - Visitor comments, replies, likes, reports
+- Public topic suggestion form for sending story ideas to the administrator
 - Admin dashboard, create post, moderation action support
 - Draft, Published, Hidden statuses
 - SEO metadata, OpenGraph image, JSON-LD per post

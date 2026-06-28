@@ -7,6 +7,7 @@ import { ThemeToggle } from './ThemeToggle.jsx'
 const navItems = [
   ['/', 'Latest'],
   ['/?sort=trending', 'Trending'],
+  ['/suggest', 'เสนอเรื่อง'],
   ['/about', 'About'],
   ['/admin', 'Admin'],
 ]

@@ -47,6 +47,7 @@ function mockRequest(action, payload) {
     })
   }
   if (action === 'likeComment') return Promise.resolve({ ok: true })
+  if (action === 'createSuggestion') return Promise.resolve({ id: `suggestion_${Date.now()}`, ...payload })
   if (action === 'adminLogin') return Promise.resolve({ token: 'local-demo-token', name: 'Demo Admin' })
   return Promise.resolve({ ok: true })
 }
@@ -58,6 +59,9 @@ export const api = {
   createComment: (comment) => request('createComment', comment),
   likeComment: (id) => request('likeComment', { id }),
   reportComment: (id) => request('reportComment', { id }),
+  createSuggestion: (suggestion) => request('createSuggestion', suggestion),
+  listSuggestions: (token) => request('listSuggestions', { token }),
+  moderateSuggestion: (id, moderation, token) => request('moderateSuggestion', { id, moderation, token }),
   adminLogin: (password) => request('adminLogin', { password }),
   createPost: (post, token) => request('createPost', { post, token }),
   updatePost: (post, token) => request('updatePost', { post, token }),
