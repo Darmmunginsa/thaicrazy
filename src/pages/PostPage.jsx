@@ -8,7 +8,7 @@ import { api } from '../services/api.js'
 import { usePosts } from '../hooks/usePosts.js'
 import { compactNumber, formatDate, splitList } from '../utils/format.js'
 import { setPageMeta } from '../utils/seo.js'
-import { getYouTubeEmbedUrl } from '../utils/youtube.js'
+import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../utils/youtube.js'
 
 export default function PostPage() {
   const { slug } = useParams()
@@ -25,16 +25,17 @@ export default function PostPage() {
         if (!alive) return
         setPost(data)
         if (data) {
+          const previewImage = data.coverImage || getYouTubeThumbnail(data.youtubeUrl) || `${import.meta.env.BASE_URL}og-image.svg`
           setPageMeta({
             title: data.metaTitle || data.title,
             description: data.metaDescription || data.description,
-            image: data.coverImage,
+            image: previewImage,
             jsonLd: {
               '@context': 'https://schema.org',
               '@type': 'Article',
               headline: data.title,
               description: data.description,
-              image: data.coverImage,
+              image: previewImage,
               datePublished: data.publishDate,
             },
           })
@@ -56,6 +57,7 @@ export default function PostPage() {
   if (!post) return <div className="container-shell py-16">ไม่พบโพสต์</div>
 
   const embedUrl = getYouTubeEmbedUrl(post.youtubeUrl)
+  const previewImage = post.coverImage || getYouTubeThumbnail(post.youtubeUrl) || `${import.meta.env.BASE_URL}og-image.svg`
 
   return (
     <article className="container-shell py-8">
@@ -72,7 +74,7 @@ export default function PostPage() {
             เว็บไซต์นี้รวบรวมข้อมูลสาธารณะและลิงก์ต้นทาง ไม่ใช่สำนักข่าว โปรดตรวจสอบวันที่เผยแพร่และแหล่งอ้างอิงเดิมก่อนสรุปข้อเท็จจริง
           </div>
 
-          <img src={post.coverImage} alt="" className="mt-6 aspect-[16/9] w-full rounded-lg object-cover shadow-sm" />
+          <img src={previewImage} alt="" className="mt-6 aspect-[16/9] w-full rounded-lg object-cover shadow-sm" />
 
           {embedUrl && (
             <section className="mt-8">

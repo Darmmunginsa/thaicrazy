@@ -5,13 +5,14 @@ import { getYouTubeThumbnail } from '../utils/youtube.js'
 
 export function PostCard({ post, commentsCount = 0 }) {
   const thumbnail = getYouTubeThumbnail(post.youtubeUrl)
+  const mediaImage = post.coverImage || thumbnail || `${import.meta.env.BASE_URL}og-image.svg`
 
   return (
     <article className="group overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
       <Link to={`/post/${post.slug}`} className="block">
         <div className="relative aspect-[16/9] overflow-hidden bg-zinc-100">
           <img
-            src={post.coverImage}
+            src={mediaImage}
             alt=""
             loading="lazy"
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
@@ -42,7 +43,7 @@ export function PostCard({ post, commentsCount = 0 }) {
           </h2>
         </Link>
         <p className="line-clamp-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{post.description}</p>
-        {thumbnail && <img src={thumbnail} alt="" loading="lazy" className="h-16 w-28 rounded-md object-cover" />}
+        {thumbnail && post.coverImage && <img src={thumbnail} alt="" loading="lazy" className="h-16 w-28 rounded-md object-cover" />}
       </div>
     </article>
   )
