@@ -1,0 +1,95 @@
+export const mockPosts = [
+  {
+    id: 'post_001',
+    title: 'ไทม์ไลน์ข้อถกเถียงโครงการคาสิโนและเอนเตอร์เทนเมนต์คอมเพล็กซ์',
+    slug: 'casino-entertainment-complex-timeline',
+    description:
+      'รวมประกาศสาธารณะ แถลงการณ์ และคลิปอภิปรายที่เกี่ยวข้องกับแนวคิดเอนเตอร์เทนเมนต์คอมเพล็กซ์ เพื่อให้ติดตามบริบทต่อเนื่องได้ในหน้าเดียว',
+    coverImage:
+      'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=80',
+    youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    category: 'การเมือง',
+    tags: ['casino', 'policy', 'public-hearing'],
+    publishDate: '2026-06-10',
+    status: 'Published',
+    views: 18642,
+    likes: 942,
+    timeline: 'Casino',
+    timelineYear: '2026',
+    sourceUrls: [
+      'https://www.bbc.com/thai',
+      'https://www.reuters.com/',
+      'https://thestandard.co/',
+    ],
+    metaTitle: 'ไทม์ไลน์คาสิโนและเอนเตอร์เทนเมนต์คอมเพล็กซ์',
+    metaDescription:
+      'บันทึกข้อมูลสาธารณะและลิงก์อ้างอิงเกี่ยวกับประเด็นคาสิโนในสังคมไทย',
+  },
+  {
+    id: 'post_002',
+    title: 'ประเด็นค่าไฟและนโยบายพลังงานที่ถูกพูดถึงซ้ำทุกปี',
+    slug: 'electricity-price-policy-memory',
+    description:
+      'รวบรวมข่าว แถลงการณ์ และบทสนทนาสาธารณะเกี่ยวกับค่าไฟ โครงสร้างพลังงาน และข้อเรียกร้องของประชาชน',
+    coverImage:
+      'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1200&q=80',
+    youtubeUrl: 'https://youtu.be/ysz5S6PUM-U',
+    category: 'เศรษฐกิจ',
+    tags: ['energy', 'electricity', 'cost-of-living'],
+    publishDate: '2026-05-21',
+    status: 'Published',
+    views: 12433,
+    likes: 510,
+    timeline: 'Energy',
+    timelineYear: '2026',
+    sourceUrls: ['https://www.thaipbs.or.th/', 'https://www.nationthailand.com/'],
+    metaTitle: 'ค่าไฟและนโยบายพลังงาน',
+    metaDescription: 'บันทึกประเด็นสาธารณะเรื่องค่าไฟและนโยบายพลังงาน',
+  },
+  {
+    id: 'post_003',
+    title: 'เหตุการณ์ข้อมูลรั่วไหลและคำชี้แจงจากหน่วยงานที่เกี่ยวข้อง',
+    slug: 'public-data-leak-statements',
+    description:
+      'จัดเก็บลิงก์ข่าว คำชี้แจง และวิดีโอที่เกี่ยวข้องกับเหตุข้อมูลรั่วไหล เพื่อสะดวกต่อการย้อนตรวจสอบ',
+    coverImage:
+      'https://images.unsplash.com/photo-1555949963-aa79dcee981c?auto=format&fit=crop&w=1200&q=80',
+    youtubeUrl: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+    category: 'เทคโนโลยี',
+    tags: ['data-leak', 'privacy', 'cybersecurity'],
+    publishDate: '2025-12-18',
+    status: 'Published',
+    views: 9340,
+    likes: 388,
+    timeline: 'Data Privacy',
+    timelineYear: '2025',
+    sourceUrls: ['https://www.reuters.com/', 'https://www.youtube.com/'],
+    metaTitle: 'ข้อมูลรั่วไหลและคำชี้แจงสาธารณะ',
+    metaDescription: 'แหล่งรวมลิงก์อ้างอิงเกี่ยวกับข้อมูลรั่วไหล',
+  },
+]
+
+export const mockComments = [
+  {
+    id: 'comment_001',
+    postId: 'post_001',
+    displayName: 'ผู้ติดตามประเด็น',
+    comment: 'อยากให้เพิ่มลิงก์เอกสารราชการต้นทางด้วยครับ จะช่วยตรวจสอบง่ายขึ้น',
+    parentId: '',
+    createdTime: '2026-06-16T08:22:00.000Z',
+    likes: 21,
+    status: 'visible',
+    pinned: true,
+  },
+  {
+    id: 'comment_002',
+    postId: 'post_001',
+    displayName: 'Memory Reader',
+    comment: 'หน้ารวมไทม์ไลน์แบบนี้ช่วยมาก เพราะข่าวเดิมกระจายหลายเว็บ',
+    parentId: '',
+    createdTime: '2026-06-15T11:09:00.000Z',
+    likes: 8,
+    status: 'visible',
+    pinned: false,
+  },
+]

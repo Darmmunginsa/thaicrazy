@@ -1,0 +1,33 @@
+// oxlint-disable react/only-export-components
+import { StrictMode, Suspense, lazy } from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import './index.css'
+import App from './App.jsx'
+import { LoadingScreen } from './components/LoadingScreen.jsx'
+
+const HomePage = lazy(() => import('./pages/HomePage.jsx'))
+const PostPage = lazy(() => import('./pages/PostPage.jsx'))
+const TimelinePage = lazy(() => import('./pages/TimelinePage.jsx'))
+const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
+const AboutPage = lazy(() => import('./pages/AboutPage.jsx'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <BrowserRouter>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/" element={<App />}>
+            <Route index element={<HomePage />} />
+            <Route path="post/:slug" element={<PostPage />} />
+            <Route path="timeline/:timeline" element={<TimelinePage />} />
+            <Route path="about" element={<AboutPage />} />
+            <Route path="admin" element={<AdminPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  </StrictMode>,
+)
