@@ -330,7 +330,7 @@ function updateComment(payload) {
   if (comment.userId !== user.userId) throw new Error('Forbidden')
   const text = clean(payload.comment)
   if (!text || text.length > 1000) throw new Error('Invalid comment')
-  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, {
+  updateCommentObject(payload.commentId, {
     comment: text,
     updatedAt: new Date().toISOString(),
   })
@@ -342,7 +342,7 @@ function deleteOwnComment(payload) {
   const user = getUserById(payload.userId)
   const comment = getCommentById(payload.commentId)
   if (comment.userId !== user.userId) throw new Error('Forbidden')
-  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, {
+  updateCommentObject(payload.commentId, {
     status: 'Deleted',
     updatedAt: new Date().toISOString(),
   })
@@ -363,7 +363,7 @@ function likeComment(payload) {
     userId: payload.userId,
     createdAt: new Date().toISOString(),
   })
-  mutateNumber(SHEETS.comments, COMMENT_HEADERS, commentId, 'likeCount', 1, 'commentId')
+  mutateCommentNumber(commentId, 'likeCount', 1)
   invalidateSheetCache(SHEETS.comments)
   invalidateSheetCache(SHEETS.commentLikes)
   return { commentId, alreadyLiked: false }
@@ -371,7 +371,7 @@ function likeComment(payload) {
 
 function reportComment(payload) {
   getActiveUser(payload.userId)
-  mutateNumber(SHEETS.comments, COMMENT_HEADERS, payload.commentId || payload.id, 'reportCount', 1, 'commentId')
+  mutateCommentNumber(payload.commentId || payload.id, 'reportCount', 1)
   invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId || payload.id }
 }
@@ -382,19 +382,19 @@ function moderateComment(payload) {
 }
 
 function adminHideComment(payload) {
-  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { status: 'Hidden', updatedAt: new Date().toISOString() })
+  updateCommentObject(payload.commentId, { status: 'Hidden', updatedAt: new Date().toISOString() })
   invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId }
 }
 
 function adminDeleteComment(payload) {
-  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { status: 'Deleted', updatedAt: new Date().toISOString() })
+  updateCommentObject(payload.commentId, { status: 'Deleted', updatedAt: new Date().toISOString() })
   invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId }
 }
 
 function adminPinComment(payload) {
-  updateObject(SHEETS.comments, COMMENT_HEADERS, payload.commentId, { pinned: Boolean(payload.pinned), updatedAt: new Date().toISOString() })
+  updateCommentObject(payload.commentId, { pinned: Boolean(payload.pinned), updatedAt: new Date().toISOString() })
   invalidateSheetCache(SHEETS.comments)
   return { commentId: payload.commentId, pinned: Boolean(payload.pinned) }
 }
@@ -615,9 +615,58 @@ function getActiveUser(userId) {
 }
 
 function getCommentById(commentId) {
-  const comment = readObjects(SHEETS.comments, COMMENT_HEADERS).find((item) => item.commentId === commentId)
+  const comment = readObjects(SHEETS.comments, COMMENT_HEADERS)
+    .map(normalizeCommentRecord)
+    .find((item) => item.commentId === commentId || item.id === commentId)
   if (!comment) throw new Error('Comment not found')
   return comment
+}
+
+function updateCommentObject(commentId, patch) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.comments)
+  const values = sheet.getDataRange().getValues()
+  const headers = values[0]
+  const commentIdColumn = headers.indexOf('commentId')
+  const legacyIdColumn = headers.indexOf('id')
+  const rowIndex = values.findIndex((row, index) => {
+    if (index === 0) return false
+    return (commentIdColumn >= 0 && row[commentIdColumn] === commentId) || (legacyIdColumn >= 0 && row[legacyIdColumn] === commentId)
+  })
+  if (rowIndex < 1) throw new Error('Row not found')
+
+  const row = values[rowIndex].slice()
+  const normalized = normalizeCommentRecord(
+    COMMENT_HEADERS.reduce((item, header) => {
+      const colIndex = headers.indexOf(header)
+      item[header] = colIndex >= 0 ? row[colIndex] : ''
+      return item
+    }, {}),
+  )
+  const isLegacyShifted = normalized.commentId === row[legacyIdColumn] && normalized.status === row[headers.indexOf('ipHash')]
+  const mappedPatch = isLegacyShifted ? legacyCommentPatch(patch) : patch
+
+  Object.keys(mappedPatch).forEach((header) => {
+    const colIndex = headers.indexOf(header)
+    if (colIndex >= 0) row[colIndex] = mappedPatch[header]
+  })
+  sheet.getRange(rowIndex + 1, 1, 1, row.length).setValues([row])
+  invalidateSheetCache(SHEETS.comments)
+}
+
+function mutateCommentNumber(commentId, field, delta) {
+  const comment = getCommentById(commentId)
+  updateCommentObject(commentId, { [field]: Number(comment[field] || 0) + delta })
+}
+
+function legacyCommentPatch(patch) {
+  const mapped = {}
+  if (Object.prototype.hasOwnProperty.call(patch, 'comment')) mapped.reports = patch.comment
+  if (Object.prototype.hasOwnProperty.call(patch, 'likeCount')) mapped.status = patch.likeCount
+  if (Object.prototype.hasOwnProperty.call(patch, 'reportCount')) mapped.pinned = patch.reportCount
+  if (Object.prototype.hasOwnProperty.call(patch, 'status')) mapped.ipHash = patch.status
+  if (Object.prototype.hasOwnProperty.call(patch, 'pinned')) mapped.updatedAt = patch.pinned
+  if (Object.prototype.hasOwnProperty.call(patch, 'updatedAt')) mapped.createdAt = patch.updatedAt
+  return mapped
 }
 
 function publicUser(user) {
@@ -638,7 +687,7 @@ function publicUser(user) {
 }
 
 function normalizeCommentRecord(item) {
-  if (item.ipHash !== 'Visible') return item
+  if (!['Visible', 'Deleted', 'Hidden', 'PendingReview'].includes(item.ipHash)) return item
 
   return {
     commentId: item.id,
@@ -651,8 +700,8 @@ function normalizeCommentRecord(item) {
     comment: item.reports,
     likeCount: Number(item.status || 0),
     reportCount: Number(item.pinned || 0),
-    status: item.ipHash,
-    pinned: false,
+    status: ['Deleted', 'Hidden', 'PendingReview'].includes(item.status) ? item.status : item.ipHash,
+    pinned: item.updatedAt === true || item.updatedAt === 'TRUE',
     createdAt: item.userId,
     updatedAt: '',
     ipHash: item.photoUrl,
