@@ -3,7 +3,7 @@ import { mockComments, mockPosts } from '../data/mockData.js'
 
 const cache = new Map()
 
-async function request(action, payload = {}, { method = 'POST', cacheMs = 0 } = {}) {
+async function request(action, payload = {}, { method = 'GET', cacheMs = 0 } = {}) {
   const cacheKey = `${action}:${JSON.stringify(payload)}`
   const cached = cache.get(cacheKey)
   if (cacheMs && cached && Date.now() - cached.time < cacheMs) return cached.data
